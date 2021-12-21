@@ -1,30 +1,99 @@
+const moment = require('moment');
 const conexao = require('../infraestrutura/conexao')
 
 class Atendimento { //responsável pela conxão
-    adiciona(atendimento) {
-        const sql = `INSERT INTO Atendimentos SET ?`
+    adiciona(atendimento, res) {
+        const dataCriacao = moment().format('YYYY-MM-DD HH:MM:SS')
+        const data = moment(atendimento.data, 'DD/MM/YYYY').format('YYYY-MM-DD HH:mm:ss')
 
-        conexao.query(sql, atendimento, (erro, resultados) => {
+        const dataEhValida = moment(data).isSameOrAfter(dataCriacao)
+        const clienteEhValido = atendimento.cliente.length >= 5 //verifica se o tamanho de cliente, dentro de atendimento é maior ou igual 5
+
+        const validacoes = [{
+                nome: 'data',
+                valido: dataEhValida,
+                mensagem: 'Data deve ser maior ou igual a data atual'
+            },
+            {
+                nome: 'cliente',
+                valido: clienteEhValido,
+                mensagem: 'Cliente deve ter pelo menos cinco caracteres'
+            }
+        ]
+
+        const erros = validacoes.filter(campo => !campo.valido)
+        const existemErros = erros.length //se não retornar um erro, o cumprimento vai ser 0 e eu posso considerar como false pq 0 em boolean é false
+
+        if (existemErros) {
+            res.status(400).json(erros)
+        } else {
+            const atendimentoDatado = {...atendimento, dataCriacao, data }
+
+            const sql = 'INSERT INTO Atendimentos SET ?'
+
+            conexao.query(sql, atendimentoDatado, (erro, resultados) => {
                 if (erro) {
-                    console.log(erro)
+                    res.status(400).json(erro)
                 } else {
-                    console.log(resultados)
+                    res.status(201).json(atendimento)
                 }
-            }) // Essa "?" significa que ele vai pegar o que a gente colocar aqui e inserir nessa teabela.
+            })
+        }
+    }
+
+    lista(res) {
+        const sql = 'SELECT * FROM Atendimentos'
+
+        conexao.query(sql, (erro, resultados) => {
+            if (erro) {
+                res.status(400).json(erro)
+            } else {
+                res.status(200).json(resultados)
+            }
+        })
+    }
+
+    buscaPorId(id, res) {
+        const sql = `SELECT * FROM Atendimentos WHERE id=${id}`
+
+        conexao.query(sql, (erro, resultados) => {
+            const atendimento = resultados[0]
+            if (erro) {
+                res.status(400).json(erro)
+            } else {
+                res.status(200).json(atendimento)
+            }
+        })
+    }
+
+    altera(id, valores, res) {
+        if (valores.data) {
+            valores.data = moment(valores.data, 'DD/MM/YYYY').format('YYYY-MM-DD HH:mm:ss')
+        }
+        const sql = 'UPDATE Atendimentos SET ? WHERE id=?'
+
+        conexao.query(sql, [valores, id], (erro, resultados) => {
+            if (erro) {
+                res.status(400).json(erro)
+            } else {
+                res.status(200).json(...valores, id)
+            }
+        })
+    }
+
+    deleta(id, res) {
+        const sql = 'DELETE FROM Atendimentos WHERE id=?'
+
+        conexao.query(sql, id, (erro, resultados) => {
+            if (erro) {
+                res.status(400).json(erro)
+            } else {
+                res.status(200).json({ id })
+            }
+        })
     }
 }
 
 module.exports = new Atendimento
 
-//Para salvar os dados na nossa base de dados, usamos a query que a biblioteca do mysql nos disponibiliza.
-
-//Agora que já cadastramos o atendimento, queremos cadastrar um novo serviço dentro da tabela Servicos no nosso sistema.
-
-//Considerando que este serviço deve possuir id (que será incrementado automaticamente), nome e preço, como seria esse código de inserção?
-
-//conexao.query(`INSERT INTO Servicos(nome, preco) VALUES('${nome}', 
-//'${preco}')`, (erro, resultados) => {
-// ...
-// }) 
-// }
-// }
+// baixei a biblioteca moment para manipular datas
